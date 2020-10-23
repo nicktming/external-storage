@@ -171,14 +171,19 @@ func main() {
 
 	if *kubeconfig != "" {
 		config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
+		if err != nil {
+			glog.Fatalf("Failed to create config from kubeconfig with err %v", err)
+		}
+	} else {
+		config, err = rest.InClusterConfig()
+		if err != nil {
+			glog.Fatalf("Failed to create in cluster config: %v", err)
+		}
 	}
 
 	// Create an InClusterConfig and use it to create a client for the controller
 	// to use to communicate with Kubernetes
-	config, err = rest.InClusterConfig()
-	if err != nil {
-		glog.Fatalf("Failed to create config: %v", err)
-	}
+
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		glog.Fatalf("Failed to create client: %v", err)
