@@ -35,10 +35,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 const (
 	provisionerNameKey = "PROVISIONER_NAME"
+)
+
+var (
+	kubeconfig     = flag.String("kubeconfig", "", "Absolute path to the kubeconfig file. Either this or master needs to be set if the provisioner is being run out of cluster.")
 )
 
 type nfsProvisioner struct {
@@ -161,10 +166,16 @@ func main() {
 	if provisionerName == "" {
 		glog.Fatalf("environment variable %s is not set! Please set it.", provisionerNameKey)
 	}
+	var config *rest.Config
+	var err error
+
+	if *kubeconfig != "" {
+		config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	}
 
 	// Create an InClusterConfig and use it to create a client for the controller
 	// to use to communicate with Kubernetes
-	config, err := rest.InClusterConfig()
+	config, err = rest.InClusterConfig()
 	if err != nil {
 		glog.Fatalf("Failed to create config: %v", err)
 	}
