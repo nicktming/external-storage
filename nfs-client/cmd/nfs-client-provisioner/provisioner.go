@@ -36,10 +36,19 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"path"
 )
 
 const (
 	provisionerNameKey = "PROVISIONER_NAME"
+	// A PV annotation for the project quota info block, needed for quota
+	// deletion.
+	annProjectBlock = "Project_block"
+	// A PV annotation for the project quota id, needed for quota deletion
+	annProjectID = "Project_Id"
+	mountPath = "/persistentvolumes"
+
 )
 
 var (
@@ -50,11 +59,9 @@ type nfsProvisioner struct {
 	client kubernetes.Interface
 	server string
 	path   string
+	// The quotaer to use for setting per-share/directory/project quotas
+	quotaer quotaer
 }
-
-const (
-	mountPath = "/persistentvolumes"
-)
 
 var _ controller.Provisioner = &nfsProvisioner{}
 
@@ -78,12 +85,22 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	if err := os.Chown(fullPath, 1500, 1500); err != nil {
 		return nil, errors.New("unable to chown 1500:1500 to provision new pv: " + err.Error())
 	}
-
 	path := filepath.Join(p.path, pvName)
+
+	projectBlock, projectID, err := p.createQuota(options.PVName, options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)])
+	if err != nil {
+		os.RemoveAll(path)
+		return nil, fmt.Errorf("error creating quota for volume: %v", err)
+	}
+
+	annotations := make(map[string]string)
+	annotations[annProjectBlock] = projectBlock
+	annotations[annProjectID] = strconv.FormatUint(uint64(projectID), 10)
 
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: options.PVName,
+			Annotations: annotations,
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
@@ -131,6 +148,11 @@ func (p *nfsProvisioner) Delete(volume *v1.PersistentVolume) error {
 		}
 	}
 
+	err = p.deleteQuota(volume)
+	if err != nil {
+		return fmt.Errorf("deleted the volume's backing path & export but error deleting quota: %v", err)
+	}
+
 	archivePath := filepath.Join(mountPath, "archived-"+pvName)
 	glog.V(4).Infof("archiving path %s to %s", oldPath, archivePath)
 	return os.Rename(oldPath, archivePath)
@@ -151,6 +173,82 @@ func (p *nfsProvisioner) getClassForVolume(pv *v1.PersistentVolume) (*storage.St
 		return nil, err
 	}
 	return class, nil
+}
+
+// createQuota creates a quota for the directory by adding a project to
+// represent the directory and setting a quota on it
+func (p *nfsProvisioner) createQuota(directory string, capacity resource.Quantity) (string, uint16, error) {
+	path := path.Join(p.path, directory)
+
+	limit := strconv.FormatInt(capacity.Value(), 10)
+
+	block, projectID, err := p.quotaer.AddProject(path, limit)
+	if err != nil {
+		return "", 0, fmt.Errorf("error adding project for path %s: %v", path, err)
+	}
+
+	err = p.quotaer.SetQuota(projectID, path, limit)
+	if err != nil {
+		p.quotaer.RemoveProject(block, projectID)
+		return "", 0, fmt.Errorf("error setting quota for path %s: %v", path, err)
+	}
+
+	return block, projectID, nil
+}
+
+func (p *nfsProvisioner) deleteQuota(volume *v1.PersistentVolume) error {
+	block, projectID, err := getBlockAndID(volume, annProjectBlock, annProjectID)
+	if err != nil {
+		return fmt.Errorf("error getting block &/or id from annotations: %v", err)
+	}
+
+	if err := p.quotaer.RemoveProject(block, uint16(projectID)); err != nil {
+		return fmt.Errorf("error removing the quota project from the projects file: %v", err)
+	}
+
+	if err := p.quotaer.UnsetQuota(); err != nil {
+		return fmt.Errorf("removed quota project from the project file but error unsetting the quota: %v", err)
+	}
+
+	return nil
+}
+
+func getBlockAndID(volume *v1.PersistentVolume, annBlock, annID string) (string, uint16, error) {
+	block, ok := volume.Annotations[annBlock]
+	if !ok {
+		return "", 0, fmt.Errorf("PV doesn't have an annotation with key %s", annBlock)
+	}
+
+	idStr, ok := volume.Annotations[annID]
+	if !ok {
+		return "", 0, fmt.Errorf("PV doesn't have an annotation %s", annID)
+	}
+	id, _ := strconv.ParseUint(idStr, 10, 16)
+
+	return block, uint16(id), nil
+}
+
+
+
+func NewNfsClientProvisioner(clientset kubernetes.Interface, server, path string, enableXfsQuota bool)  *nfsProvisioner {
+	var quotaer quotaer
+	var err error
+	if enableXfsQuota {
+		quotaer, err = newXfsQuotaer(path)
+		if err != nil {
+			glog.Fatalf("Error creating xfs quotaer! %v", err)
+		}
+	} else {
+		quotaer = newDummyQuotaer()
+	}
+
+	clientNFSProvisioner := &nfsProvisioner{
+		client: clientset,
+		server: server,
+		path:   path,
+		quotaer: quotaer,
+	}
+	return clientNFSProvisioner
 }
 
 func main() {
@@ -199,11 +297,7 @@ func main() {
 		glog.Fatalf("Error getting server version: %v", err)
 	}
 
-	clientNFSProvisioner := &nfsProvisioner{
-		client: clientset,
-		server: server,
-		path:   path,
-	}
+	clientNFSProvisioner := NewNfsClientProvisioner(clientset, server, path, true)
 	// Start the provision controller which will dynamically provision efs NFS
 	// PVs
 	pc := controller.NewProvisionController(clientset, provisionerName, clientNFSProvisioner, serverVersion.GitVersion)
