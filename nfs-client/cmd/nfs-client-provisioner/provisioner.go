@@ -74,7 +74,10 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	if err := os.MkdirAll(fullPath, 0777); err != nil {
 		return nil, errors.New("unable to create directory to provision new pv: " + err.Error())
 	}
-	os.Chmod(fullPath, 0777)
+	//os.Chmod(fullPath, 0777)
+	if err := os.Chown(fullPath, 1500, 1500); err != nil {
+		return nil, errors.New("unable to chown 1500:1500 to provision new pv: " + err.Error())
+	}
 
 	path := filepath.Join(p.path, pvName)
 
