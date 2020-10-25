@@ -143,6 +143,11 @@ func (q *xfsQuotaer) restoreQuotas() error {
 			continue
 		}
 
+		if _, err := os.Stat(path.Join(q.xfsPath, directory)); os.IsNotExist(err) {
+			q.RemoveProject(string(match[0]), uint16(projectID))
+			continue
+		}
+
 		if err := q.SetQuota(uint16(projectID), directory, bhard); err != nil {
 			return fmt.Errorf("error restoring quota for directory %s: %v", directory, err)
 		}
