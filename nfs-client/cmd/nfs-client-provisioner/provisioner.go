@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"path"
 )
 
 const (
@@ -46,7 +47,7 @@ const (
 	annProjectBlock = "Project_block"
 	// A PV annotation for the project quota id, needed for quota deletion
 	annProjectID = "Project_Id"
-	mountPath = "/persistentvolumes"
+	mountPath = "/nfs"
 	// the uid and gid for the creted pv
 	labelUid = "uid"
 	labelGid = "gid"
@@ -201,9 +202,8 @@ func (p *nfsProvisioner) getClassForVolume(pv *v1.PersistentVolume) (*storage.St
 // createQuota creates a quota for the directory by adding a project to
 // represent the directory and setting a quota on it
 func (p *nfsProvisioner) createQuota(directory string, capacity resource.Quantity) (string, uint16, error) {
-	//path := path.Join(p.path, directory)
+	path := path.Join(p.path, directory)
 
-	path := directory
 	limit := strconv.FormatInt(capacity.Value(), 10)
 
 	block, projectID, err := p.quotaer.AddProject(path, limit)

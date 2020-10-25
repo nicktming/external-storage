@@ -26,7 +26,7 @@ spec:
             privileged: true
           volumeMounts:
             - name: nfs-client-root
-              mountPath: /persistentvolumes
+              mountPath: /nfs
           env:
             - name: PROVISIONER_NAME
               value: fuseim.pri/ifs
