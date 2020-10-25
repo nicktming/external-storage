@@ -19,9 +19,11 @@ spec:
         app: nfs-client-provisioner
     spec:
       serviceAccountName: nfs-client-provisioner
+      securityContext:
+        privileged: true
       containers:
         - name: nfs-client-provisioner
-          image: quay.io/external_storage/nfs-client-provisioner:latest
+          image: nicktming/nfs-client-provisioner:v0.0.1
           volumeMounts:
             - name: nfs-client-root
               mountPath: /persistentvolumes
@@ -31,9 +33,9 @@ spec:
             - name: NFS_SERVER
               value: 10.10.10.60
             - name: NFS_PATH
-              value: /ifs/kubernetes
+              value: /nfs
       volumes:
         - name: nfs-client-root
           nfs:
             server: 10.10.10.60
-            path: /ifs/kubernetes
+            path: /nfs
