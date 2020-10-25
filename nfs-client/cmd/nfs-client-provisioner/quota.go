@@ -172,6 +172,10 @@ func (q *xfsQuotaer) AddProject(directory, bhard string) (string, uint16, error)
 	// Specify the new project
 	cmd := exec.Command("xfs_quota", "-x", "-c", fmt.Sprintf("project -s -p %s %s", directory, projectIDStr), q.xfsPath)
 	out, err := cmd.CombinedOutput()
+
+	fmt.Printf("exec %s, out: %v with error: %v\n",
+		fmt.Sprintf("project -s -p %s %s", directory, projectIDStr), out, err)
+
 	if err != nil {
 		deleteID(q.mapMutex, q.projectIDs, projectID)
 		removeFromFile(q.fileMutex, q.projectsFile, block)
