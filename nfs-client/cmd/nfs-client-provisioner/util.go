@@ -67,12 +67,14 @@ func addToFile(mutex *sync.Mutex, path string, toAdd string) error {
 	}
 	defer file.Close()
 
+	fmt.Printf("======>write toAdd:%v\n", toAdd)
 	if _, err = file.WriteString(toAdd); err != nil {
+		fmt.Printf("======>write toAdd:%v, success with error: %v\n", toAdd, err)
 		mutex.Unlock()
 		return err
 	}
 	file.Sync()
-
+	fmt.Printf("======>write toAdd:%v, success with nil\n", toAdd)
 	mutex.Unlock()
 	return nil
 }
