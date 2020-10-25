@@ -19,11 +19,11 @@ spec:
         app: nfs-client-provisioner
     spec:
       serviceAccountName: nfs-client-provisioner
-      securityContext:
-        privileged: true
       containers:
         - name: nfs-client-provisioner
           image: nicktming/nfs-client-provisioner:v0.0.1
+          securityContext:
+            privileged: true
           volumeMounts:
             - name: nfs-client-root
               mountPath: /persistentvolumes
