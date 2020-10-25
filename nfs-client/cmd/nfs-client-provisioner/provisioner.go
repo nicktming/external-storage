@@ -48,6 +48,10 @@ const (
 	// A PV annotation for the project quota id, needed for quota deletion
 	annProjectID = "Project_Id"
 	mountPath = "/persistentvolumes"
+	// the uid and gid for the creted pv
+	labelUid = "uid"
+	labelGid = "gid"
+
 
 )
 
@@ -82,8 +86,28 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 		return nil, errors.New("unable to create directory to provision new pv: " + err.Error())
 	}
 	//os.Chmod(fullPath, 0777)
-	if err := os.Chown(fullPath, 1500, 1500); err != nil {
-		return nil, errors.New("unable to chown 1500:1500 to provision new pv: " + err.Error())
+
+	uidFromLabel := options.PVC.Labels[labelUid]
+	gidFromLabel := options.PVC.Labels[labelGid]
+
+	uid := 0
+	gid := 0
+	var err error
+	if uidFromLabel != "" {
+		uid, err = strconv.Atoi(uidFromLabel)
+		if err != nil {
+			return nil, errors.New("unable to parse uid " + uidFromLabel + " with " + err.Error())
+		}
+	}
+	if gidFromLabel != "" {
+		gid, err = strconv.Atoi(gidFromLabel)
+		if err != nil {
+			return nil, errors.New("unable to parse gid " + gidFromLabel + " with " + err.Error())
+		}
+	}
+
+	if err := os.Chown(fullPath, uid, gid); err != nil {
+		return nil, fmt.Errorf("unable to chown %v:%v to provision new pv with err %v", uid, gid, err.Error())
 	}
 	path := filepath.Join(p.path, pvName)
 

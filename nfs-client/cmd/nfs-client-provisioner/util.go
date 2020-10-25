@@ -87,6 +87,7 @@ func removeFromFile(mutex *sync.Mutex, path string, toRemove string) error {
 	}
 
 	removed := strings.Replace(string(read), toRemove, "", -1)
+	fmt.Printf("try to replace toRemove:%v with read: %v, and got removed: %v\n", toRemove, string(read), removed)
 	err = ioutil.WriteFile(path, []byte(removed), 0)
 	if err != nil {
 		mutex.Unlock()

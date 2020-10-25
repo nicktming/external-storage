@@ -3,8 +3,8 @@ apiVersion: v1
 metadata:
   name: test-claim
   labels:
-    uid: 1500
-    gid: 1500
+    uid: "1500"
+    gid: "1500"
 spec:
   storageClassName: "managed-nfs-storage"
   accessModes:
