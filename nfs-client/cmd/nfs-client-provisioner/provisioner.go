@@ -258,12 +258,12 @@ func NewNfsClientProvisioner(clientset kubernetes.Interface, server, path string
 	var quotaer quotaer
 	var err error
 	if enableXfsQuota {
-		quotaer, err = newXfsQuotaer(mountPath)
+		quotaer, err = NewXfsQuotaer(mountPath)
 		if err != nil {
 			glog.Fatalf("Error creating xfs quotaer! %v", err)
 		}
 	} else {
-		quotaer = newDummyQuotaer()
+		quotaer = NewDummyQuotaer()
 	}
 
 	clientNFSProvisioner := &nfsProvisioner{

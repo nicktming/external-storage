@@ -19,7 +19,7 @@ type quotaer interface {
 	AddProject(string, string) (string, uint16, error)
 	RemoveProject(string, uint16) error
 	SetQuota(uint16, string, string) error
-	UnsetQuota() error
+	UnsetQuota(uint16) error
 }
 
 type xfsQuotaer struct {
@@ -38,7 +38,7 @@ type xfsQuotaer struct {
 
 var _ quotaer = &xfsQuotaer{}
 
-func newXfsQuotaer(xfsPath string) (*xfsQuotaer, error) {
+func NewXfsQuotaer(xfsPath string) (*xfsQuotaer, error) {
 	if _, err := os.Stat(xfsPath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("xfs path %s does not exist", xfsPath)
 	}
@@ -196,7 +196,15 @@ func (q *xfsQuotaer) SetQuota(projectID uint16, directory, bhard string) error {
 	return nil
 }
 
-func (q *xfsQuotaer) UnsetQuota() error {
+func (q *xfsQuotaer) UnsetQuota(projectID uint16) error {
+	projectIDStr := strconv.FormatUint(uint64(projectID), 10)
+
+	cmd := exec.Command("xfs_quota", "-x", "-c", fmt.Sprintf("limit -p bhard=0 %s", projectIDStr), q.xfsPath)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("xfs_quota UnsetQuota failed with error: %v, output: %s", err, out)
+	}
+
 	return nil
 }
 
@@ -204,7 +212,7 @@ type dummyQuotaer struct{}
 
 var _ quotaer = &dummyQuotaer{}
 
-func newDummyQuotaer() *dummyQuotaer {
+func NewDummyQuotaer() *dummyQuotaer {
 	return &dummyQuotaer{}
 }
 
@@ -217,6 +225,6 @@ func (q *dummyQuotaer) RemoveProject(_ string, _ uint16) error {
 func (q *dummyQuotaer) SetQuota(_ uint16, _, _ string) error {
 	return nil
 }
-func (q *dummyQuotaer) UnsetQuota() error {
+func (q *dummyQuotaer) UnsetQuota(_ uint16) error {
 	return nil
 }
