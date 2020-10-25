@@ -139,13 +139,10 @@ func (q *xfsQuotaer) restoreQuotas() error {
 		// If directory referenced by projects file no longer exists, don't set a
 		// quota for it: will fail
 		if _, err := os.Stat(directory); os.IsNotExist(err) {
-			q.RemoveProject(string(match[0]), uint16(projectID))
-			continue
-		}
-
-		if _, err := os.Stat(path.Join(q.xfsPath, directory)); os.IsNotExist(err) {
-			q.RemoveProject(string(match[0]), uint16(projectID))
-			continue
+			if _, err := os.Stat(path.Join(q.xfsPath, directory)); os.IsNotExist(err) {
+				q.RemoveProject(string(match[0]), uint16(projectID))
+				continue
+			}
 		}
 
 		if err := q.SetQuota(uint16(projectID), directory, bhard); err != nil {
