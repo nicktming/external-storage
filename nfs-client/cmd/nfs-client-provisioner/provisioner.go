@@ -230,7 +230,7 @@ func (p *nfsProvisioner) deleteQuota(volume *v1.PersistentVolume) error {
 		return fmt.Errorf("error removing the quota project from the projects file: %v", err)
 	}
 
-	if err := p.quotaer.UnsetQuota(); err != nil {
+	if err := p.quotaer.UnsetQuota(projectID); err != nil {
 		return fmt.Errorf("removed quota project from the project file but error unsetting the quota: %v", err)
 	}
 
