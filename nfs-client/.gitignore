@@ -23,4 +23,8 @@ _testmain.go
 *.test
 *.prof
 
-nfs-client-provisioner
+#nfs-client-provisioner
+
+.DS_Store
+
+*/.DS_Store

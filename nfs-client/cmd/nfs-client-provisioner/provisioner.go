@@ -87,7 +87,7 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	}
 	path := filepath.Join(p.path, pvName)
 
-	projectBlock, projectID, err := p.createQuota(options.PVName, options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)])
+	projectBlock, projectID, err := p.createQuota(pvName, options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)])
 	if err != nil {
 		os.RemoveAll(path)
 		return nil, fmt.Errorf("error creating quota for volume: %v", err)
@@ -234,7 +234,7 @@ func NewNfsClientProvisioner(clientset kubernetes.Interface, server, path string
 	var quotaer quotaer
 	var err error
 	if enableXfsQuota {
-		quotaer, err = newXfsQuotaer(path)
+		quotaer, err = newXfsQuotaer(mountPath)
 		if err != nil {
 			glog.Fatalf("Error creating xfs quotaer! %v", err)
 		}
