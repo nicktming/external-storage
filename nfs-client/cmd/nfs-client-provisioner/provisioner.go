@@ -51,12 +51,15 @@ const (
 	// the uid and gid for the creted pv
 	labelUid = "uid"
 	labelGid = "gid"
+	// the nfs directory name
+	labelDirectoryName = "nfs-directory-name"
 
 
 )
 
 var (
 	kubeconfig     = flag.String("kubeconfig", "", "Absolute path to the kubeconfig file. Either this or master needs to be set if the provisioner is being run out of cluster.")
+	enableXfsQuota = flag.Bool("enable-xfs-quota", false, "If the provisioner will set xfs quotas for each volume it provisions. Requires that the directory it creates volumes in ('/export') is xfs mounted with option prjquota/pquota, and that it has the privilege to run xfs_quota. Default false.")
 )
 
 type nfsProvisioner struct {
@@ -69,7 +72,40 @@ type nfsProvisioner struct {
 
 var _ controller.Provisioner = &nfsProvisioner{}
 
+// AccessModesContains returns whether the requested mode is contained by modes
+func AccessModesContains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
+	for _, m := range modes {
+		if m == mode {
+			return true
+		}
+	}
+	return false
+}
+
+// AccessModesContainedInAll returns whether all of the requested modes are contained by modes
+func AccessModesContainedInAll(indexedModes []v1.PersistentVolumeAccessMode, requestedModes []v1.PersistentVolumeAccessMode) bool {
+	for _, mode := range requestedModes {
+		if !AccessModesContains(indexedModes, mode) {
+			return false
+		}
+	}
+	return true
+}
+
+
+// getAccessModes returns access modes nfs volume supported.
+func (p *nfsProvisioner) getAccessModes() []v1.PersistentVolumeAccessMode {
+	return []v1.PersistentVolumeAccessMode{
+		v1.ReadWriteOnce,
+		v1.ReadOnlyMany,
+		v1.ReadWriteMany,
+	}
+}
+
 func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
+	if !AccessModesContainedInAll(p.getAccessModes(), options.PVC.Spec.AccessModes) {
+		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", options.PVC.Spec.AccessModes, p.getAccessModes())
+	}
 	if options.PVC.Spec.Selector != nil {
 		return nil, fmt.Errorf("claim Selector is not supported")
 	}
@@ -79,6 +115,11 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	pvcName := options.PVC.Name
 
 	pvName := strings.Join([]string{pvcNamespace, pvcName, options.PVName}, "-")
+
+	directoryName := options.PVC.Labels[labelDirectoryName]
+	if directoryName != "" {
+		pvName = directoryName
+	}
 
 	fullPath := filepath.Join(mountPath, pvName)
 	glog.V(4).Infof("creating path %s", fullPath)
@@ -321,7 +362,7 @@ func main() {
 		glog.Fatalf("Error getting server version: %v", err)
 	}
 
-	clientNFSProvisioner := NewNfsClientProvisioner(clientset, server, path, true)
+	clientNFSProvisioner := NewNfsClientProvisioner(clientset, server, path, *enableXfsQuota)
 	// Start the provision controller which will dynamically provision efs NFS
 	// PVs
 	pc := controller.NewProvisionController(clientset, provisionerName, clientNFSProvisioner, serverVersion.GitVersion)
