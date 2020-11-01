@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 
 	"github.com/golang/glog"
-	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -67,9 +66,9 @@ type nfsProvisioner struct {
 	quotaer quotaer
 }
 
-var _ controller.Provisioner = &nfsProvisioner{}
+var _ Provisioner = &nfsProvisioner{}
 
-func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
+func (p *nfsProvisioner) Provision(options VolumeOptions) (*v1.PersistentVolume, error) {
 	if options.PVC.Spec.Selector != nil {
 		return nil, fmt.Errorf("claim Selector is not supported")
 	}
@@ -324,6 +323,6 @@ func main() {
 	clientNFSProvisioner := NewNfsClientProvisioner(clientset, server, path, true)
 	// Start the provision controller which will dynamically provision efs NFS
 	// PVs
-	pc := controller.NewProvisionController(clientset, provisionerName, clientNFSProvisioner, serverVersion.GitVersion)
+	pc := NewProvisionController(clientset, provisionerName, clientNFSProvisioner, serverVersion.GitVersion)
 	pc.Run(wait.NeverStop)
 }

@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"k8s.io/api/core/v1"
 )
 
 // generateID generates a unique exportID to assign an export
@@ -94,5 +95,26 @@ func removeFromFile(mutex *sync.Mutex, path string, toRemove string) error {
 
 	mutex.Unlock()
 	return nil
+}
+
+// GetPersistentVolumeClaimClass returns StorageClassName. If no storage class was
+// requested, it returns "".
+func GetPersistentVolumeClaimClass(claim *v1.PersistentVolumeClaim) string {
+	// Use beta annotation first
+	if class, found := claim.Annotations[v1.BetaStorageClassAnnotation]; found {
+		return class
+	}
+
+	if claim.Spec.StorageClassName != nil {
+		return *claim.Spec.StorageClassName
+	}
+
+	return ""
+}
+
+// CheckPersistentVolumeClaimModeBlock checks VolumeMode.
+// If the mode is Block, return true otherwise return false.
+func CheckPersistentVolumeClaimModeBlock(pvc *v1.PersistentVolumeClaim) bool {
+	return pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == v1.PersistentVolumeBlock
 }
 
