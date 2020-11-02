@@ -126,7 +126,7 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	_, err = os.Stat(fullPath)
 	if err == nil || os.IsExist(err) {
 		glog.Infof("directory %s already exists with %s", fullPath, err)
-		return nil, errors.New("directory: %s" + fullPath + " already exists and return " + err.Error())
+		return nil, errors.New("directory: %s" + fullPath + " already exists with error  " + err)
 	}
 
 	glog.Infof("creating path %s", fullPath)
