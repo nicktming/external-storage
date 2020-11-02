@@ -38,6 +38,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"path"
+	"io/ioutil"
+	"log"
 )
 
 const (
@@ -92,6 +94,15 @@ func AccessModesContainedInAll(indexedModes []v1.PersistentVolumeAccessMode, req
 	return true
 }
 
+func IsDir(fileAddr string)bool{
+	s,err:=os.Stat(fileAddr)
+	if err!=nil{
+		glog.Infof(err)
+		return false
+	}
+	return s.IsDir()
+}
+
 
 // getAccessModes returns access modes nfs volume supported.
 func (p *nfsProvisioner) getAccessModes() []v1.PersistentVolumeAccessMode {
@@ -122,6 +133,16 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	}
 
 	fullPath := filepath.Join(mountPath, pvName)
+
+	var err error
+	_, err = os.Stat(fullPath)
+	if err == nil || os.IsExist(err) {
+		if os.IsExist(err){
+			glog.Infof(err)
+			return nil, errors.New("directory: %s" + fullPath + " already exists and return " + err.Error())
+		}
+	}
+
 	glog.Infof("creating path %s", fullPath)
 	if err := os.MkdirAll(fullPath, 0777); err != nil {
 		glog.Infof("unable to create directory to provision new pv: %v", err.Error())
@@ -134,7 +155,7 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 
 	uid := 0
 	gid := 0
-	var err error
+
 	if uidFromLabel != "" {
 		uid, err = strconv.Atoi(uidFromLabel)
 		if err != nil {
