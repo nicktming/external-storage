@@ -122,8 +122,9 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	}
 
 	fullPath := filepath.Join(mountPath, pvName)
-	glog.V(4).Infof("creating path %s", fullPath)
+	glog.Infof("creating path %s", fullPath)
 	if err := os.MkdirAll(fullPath, 0777); err != nil {
+		glog.Infof("unable to create directory to provision new pv: %v", err.Error())
 		return nil, errors.New("unable to create directory to provision new pv: " + err.Error())
 	}
 	//os.Chmod(fullPath, 0777)
